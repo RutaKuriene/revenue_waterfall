@@ -1,0 +1,70 @@
+version: 2
+
+models:
+  - name: dim_accounts
+    description: >
+      Account dimension table enriched with subscription and churn summaries.
+      One row per account with aggregated metrics.
+    columns:
+      - name: account_id
+        description: Unique customer identifier
+        data_tests:
+          - unique
+          - not_null
+
+  - name: fct_subscriptions
+    description: >
+      Subscription fact table enriched with account info and derived fields
+      like subscription status and duration.
+    columns:
+      - name: subscription_id
+        data_tests:
+          - unique
+          - not_null
+      - name: subscription_status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['trial', 'churned', 'active', 'inactive']
+
+  - name: fct_feature_usage
+    description: Feature usage events joined with subscription context
+    columns:
+      - name: usage_id
+        data_tests:
+          - unique
+          - not_null
+
+  - name: fct_support_tickets
+    description: Support tickets with derived resolution speed tier
+    columns:
+      - name: ticket_id
+        data_tests:
+          - unique
+          - not_null
+      - name: resolution_speed_tier
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['fast', 'normal', 'slow', 'very_slow']
+
+  - name: fct_churn_events
+    description: Churn events enriched with account demographics and time-to-churn
+    columns:
+      - name: churn_event_id
+        data_tests:
+          - unique
+          - not_null
+
+  - name: monthly_subscription_spine
+    description: >
+      Exploded view of subscriptions by month. Each row represents one
+      subscription active in a given month (excluding trials and zero-MRR).
+      Core building block for MRR waterfall analysis.
+    columns:
+      - name: subscription_id
+        data_tests:
+          - not_null
+      - name: report_month
+        data_tests:
+          - not_null

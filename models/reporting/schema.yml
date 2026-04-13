@@ -1,0 +1,46 @@
+version: 2
+
+models:
+  - name: reporting_mrr_waterfall
+    description: >
+      Monthly MRR waterfall showing revenue movements by type: new business,
+      expansion, contraction, churn, and reactivation. Each row is one
+      movement type for one month.
+    columns:
+      - name: report_month
+        description: Calendar month of the MRR movement
+        data_tests:
+          - not_null
+      - name: movement_type
+        description: Category of MRR change
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['new', 'expansion', 'contraction', 'churn', 'reactivation']
+      - name: account_count
+        description: Number of accounts contributing to this movement
+        data_tests:
+          - not_null
+      - name: mrr_change
+        description: Dollar change in MRR for this movement type
+
+  - name: reporting_mrr_summary
+    description: >
+      Pivoted monthly MRR summary with beginning MRR, all movement categories,
+      ending MRR, and key SaaS metrics like net MRR growth rate and gross
+      churn rate. One row per month. This is the CFO-facing revenue waterfall.
+    columns:
+      - name: report_month
+        description: Calendar month
+        data_tests:
+          - unique
+          - not_null
+      - name: ending_mrr
+        description: Total MRR at end of month
+      - name: net_mrr_change
+        description: Net change in MRR from all movements
+      - name: net_mrr_growth_rate_pct
+        description: Month-over-month MRR growth as percentage
+      - name: gross_mrr_churn_rate_pct
+        description: Gross MRR churn as percentage of beginning MRR

@@ -1,0 +1,125 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: RAW
+    tables:
+      - name: accounts
+        description: Customer accounts for Company X SaaS platform
+        columns:
+          - name: account_id
+            description: Unique customer identifier (primary key)
+          - name: account_name
+            description: Fictional company name
+          - name: industry
+            description: SaaS vertical (DevTools, EdTech, FinTech, etc.)
+          - name: country
+            description: ISO-2 country code
+          - name: signup_date
+            description: Account creation date
+          - name: referral_source
+            description: How the account was acquired
+          - name: plan_tier
+            description: Initial plan tier (Basic, Pro, Enterprise)
+          - name: seats
+            description: Licensed user count
+          - name: is_trial
+            description: Whether account is currently trialing
+          - name: churn_flag
+            description: Whether account has churned at any point
+
+      - name: subscriptions
+        description: Subscription records tracking plan changes over time
+        columns:
+          - name: subscription_id
+            description: Unique subscription identifier (primary key)
+          - name: account_id
+            description: FK to accounts
+          - name: start_date
+            description: Subscription start date
+          - name: end_date
+            description: Subscription end date (null if active)
+          - name: plan_tier
+            description: Plan at time of billing
+          - name: seats
+            description: Licensed seats
+          - name: mrr_amount
+            description: Monthly recurring revenue
+          - name: arr_amount
+            description: Annual recurring revenue
+          - name: is_trial
+            description: Trial status
+          - name: upgrade_flag
+            description: Plan upgraded mid-cycle
+          - name: downgrade_flag
+            description: Plan downgraded mid-cycle
+          - name: churn_flag
+            description: True if subscription ended
+          - name: billing_frequency
+            description: Monthly or annual billing
+          - name: auto_renew_flag
+            description: Auto-renewal status
+
+      - name: feature_usage
+        description: Daily feature usage events per subscription
+        columns:
+          - name: usage_id
+            description: Unique usage event identifier
+          - name: subscription_id
+            description: FK to subscriptions
+          - name: usage_date
+            description: Date of usage
+          - name: feature_name
+            description: Feature identifier from pool of 40
+          - name: usage_count
+            description: Event frequency
+          - name: usage_duration_secs
+            description: Time spent in seconds
+          - name: error_count
+            description: Logged errors
+          - name: is_beta_feature
+            description: Whether feature is in beta
+
+      - name: support_tickets
+        description: Customer support tickets
+        columns:
+          - name: ticket_id
+            description: Unique ticket identifier
+          - name: account_id
+            description: FK to accounts
+          - name: submitted_at
+            description: Ticket open timestamp
+          - name: closed_at
+            description: Ticket resolution timestamp
+          - name: resolution_time_hours
+            description: Time to resolution in hours
+          - name: priority
+            description: Ticket priority (low, medium, high, urgent)
+          - name: first_response_time_minutes
+            description: Minutes to first response
+          - name: satisfaction_score
+            description: CSAT score 1-5 (null if no response)
+          - name: escalation_flag
+            description: Whether ticket was escalated
+
+      - name: churn_events
+        description: Account churn events with reasons
+        columns:
+          - name: churn_event_id
+            description: Unique churn event identifier
+          - name: account_id
+            description: FK to accounts
+          - name: churn_date
+            description: Date account churned
+          - name: reason_code
+            description: Churn reason category
+          - name: refund_amount_usd
+            description: Refund or credit issued
+          - name: preceding_upgrade_flag
+            description: Had upgrade within 90 days before churn
+          - name: preceding_downgrade_flag
+            description: Had downgrade within 90 days before churn
+          - name: is_reactivation
+            description: Whether this account previously churned
+          - name: feedback_text
+            description: Optional customer feedback
