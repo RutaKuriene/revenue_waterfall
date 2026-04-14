@@ -5,7 +5,8 @@ models:
     description: >
       Monthly MRR waterfall showing revenue movements by type: new business,
       expansion, contraction, churn, and reactivation. Each row is one
-      movement type for one month.
+      movement type for one month. Churn is classified from churn events
+      (`fct_churn_events`) rather than inferred only from zero-MRR months.
     columns:
       - name: report_month
         description: Calendar month of the MRR movement

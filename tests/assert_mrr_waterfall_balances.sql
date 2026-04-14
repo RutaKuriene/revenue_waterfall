@@ -1,6 +1,5 @@
 -- Custom test: Ending MRR should equal Beginning MRR + Net MRR Change
--- This validates the fundamental waterfall accounting identity.
--- We allow a small tolerance for floating point rounding.
+-- Allow a small tolerance for floating point rounding.
 
 with validation as (
     select

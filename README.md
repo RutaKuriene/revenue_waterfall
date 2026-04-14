@@ -32,7 +32,7 @@ The core waterfall model. Classifies monthly MRR movements into:
 | **New** | First month an account ever generates MRR |
 | **Expansion** | Account's MRR increased vs. prior month |
 | **Contraction** | Account's MRR decreased vs. prior month (but didn't churn) |
-| **Churn** | Account had MRR last month but has $0 this month |
+| **Churn** | Account has a non-reactivation churn event in the month (from `churn_events`) and MRR decreased vs. prior month |
 | **Reactivation** | Account returns after a gap in MRR (previously had revenue, left, came back) |
 
 ### `reporting_mrr_summary`
@@ -43,19 +43,21 @@ Intermediate model that "explodes" each subscription into one row per active mon
 
 ## Modeling Decisions & Assumptions
 
-1. **Trial exclusion**: Subscriptions where `is_trial = TRUE` or `mrr_amount = 0` are excluded from the MRR waterfall. Trials don't contribute real revenue.
+1. **Trial exclusion**: Subscriptions where `is_trial = TRUE` or `mrr_amount = 0` are excluded from the MRR waterfall, as are considered not contributing to real revenue.
 
-2. **MRR aggregation at account level**: The waterfall aggregates MRR per account per month (not per subscription). An account with multiple subscriptions has its MRR summed. This is the standard SaaS metric approach.
+2. **MRR aggregation at account level**: The waterfall aggregates MRR per account per month (not per subscription). An account with multiple subscriptions has its MRR summed.
 
-3. **Churn detection**: Churn is detected by absence - if an account had MRR in month N but not in month N+1, it's churned. This is more reliable than relying solely on `churn_flag` since it captures all revenue loss.
+3. **Churn detection**: Churn is event-driven. The waterfall classifies churn using `churn_events` (via `fct_churn_events`), excluding reactivation events, and only when account MRR decreases vs. prior month.
 
-4. **Reactivation vs. New**: An account's first-ever MRR month is "new." If it churns and later returns, that return is "reactivation." This is determined by checking if the account had any earlier MRR months.
+4. **Churn-event deduplication for waterfall**: Churn events are deduplicated to one record per account per churn month before classification to avoid inflating account counts from duplicate source events.
 
-5. **Month spine generation**: Uses a date spine from the earliest subscription start to the latest subscription end (or current date). Subscriptions are active from their start month through the month *before* their end date.
+5. **Reactivation vs. New**: An account's first-ever MRR month is "new." If it churns and later returns, that return is "reactivation." This is determined by checking if the account had any earlier MRR months.
 
-6. **Retained accounts**: Accounts with no MRR change are classified as "retained" but excluded from the waterfall output since they represent no movement.
+6. **Month spine generation**: Uses a date spine from the earliest subscription start to the latest subscription end (or current date). Subscriptions are active from their start month through the month *before* their end date.
 
-7. **Source deduplication**: The `feature_usage` source contains duplicate `usage_id` values. The staging model deduplicates using `ROW_NUMBER()`, keeping the most recent record per `usage_id`.
+7. **Retained accounts**: Accounts with no MRR change are classified as "retained" but excluded from the waterfall output since they represent no movement.
+
+8. **Source deduplication**: The `feature_usage` source contains duplicate `usage_id` values. The staging model deduplicates using `ROW_NUMBER()`, keeping the most recent record per `usage_id`.
 
 ## Data Quality
 
@@ -65,7 +67,7 @@ Intermediate model that "explodes" each subscription into one row per active mon
 - `relationships` tests for foreign keys (subscriptions -> accounts, churn_events -> accounts)
 
 ### Custom Business Logic Tests
-- **`assert_mrr_waterfall_balances`**: Validates that `ending_mrr = beginning_mrr + net_mrr_change` for every month (within $1 tolerance). This is the fundamental accounting identity for the waterfall.
+- **`assert_mrr_waterfall_balances`**: Validates that `ending_mrr = beginning_mrr + net_mrr_change` for every month (within $1 tolerance).
 - **`assert_no_negative_mrr_in_spine`**: Ensures no subscription contributes negative MRR to the spine.
 
 ## Setup Instructions
@@ -105,7 +107,7 @@ PUT file://data/feature_usage.csv @RAW.CSV_STAGE;
 PUT file://data/support_tickets.csv @RAW.CSV_STAGE;
 PUT file://data/churn_events.csv @RAW.CSV_STAGE;
 
--- Then COPY INTO each table (see table schemas in Appendix)
+-- Then COPY INTO each table 
 ```
 
 ### 3. Run the Project
@@ -176,24 +178,8 @@ revenue_waterfall/
 
 2. **Mid-month changes**: The model uses monthly granularity. Upgrades/downgrades within a month are captured only as net change.
 
-3. **Annual billing**: Annual subscriptions with MRR > 0 are treated the same as monthly. If the business wants to spread ARR differently, the spine logic would need adjustment.
+3. **Annual billing**: Annual subscriptions with MRR > 0 are treated the same as monthly.
 
 4. **No calendar table**: The month spine is generated dynamically. A production version should use a shared calendar/date dimension.
 
-## Future Improvements (Production Readiness)
-
-### Scalability & Performance
-- **Incremental models** for `monthly_subscription_spine` and `fct_feature_usage` (largest tables)
-- **Cluster keys** on date columns for large scan queries
-- Shared **calendar/date dimension** to replace dynamic spine generation
-
-### Data Freshness & Incremental Strategies
-- **dbt source freshness** checks on the RAW tables
-- **Snapshots** on `subscriptions` to capture SCD Type 2 plan/tier changes over time
-- Incremental strategy: append-only for usage data, merge for subscription state
-
-### Monitoring & Data Quality Alerting
-- **dbt exposures** linking models to downstream BI dashboards
-- Automated alerting on anomalous MRR churn spikes (>2 standard deviations)
-- Elementary or re_data for historical test result tracking
-- Slack/email notifications on test failures in CI/CD pipeline
+5. **Event timing dependence**: Churn month attribution depends on churn event timestamps. Late or missing events can shift churn classification across months.

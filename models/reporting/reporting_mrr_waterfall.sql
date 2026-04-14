@@ -7,6 +7,16 @@ with monthly_mrr as (
     group by account_id, report_month
 ),
 
+churn_events as (
+    select
+        account_id,
+        churn_month as report_month,
+        true as has_churn_event
+    from {{ ref('fct_churn_events') }}
+    where coalesce(is_reactivation, false) = false
+    group by account_id, churn_month
+),
+
 months as (
     select distinct report_month
     from monthly_mrr
@@ -58,22 +68,26 @@ classified as (
         c.current_mrr,
         c.previous_mrr,
         c.current_mrr - c.previous_mrr as mrr_change,
+        coalesce(ce.has_churn_event, false) as has_churn_event,
         f.first_active_month,
         case
+            when coalesce(ce.has_churn_event, false) and c.previous_mrr > 0 and c.current_mrr < c.previous_mrr
+                then 'churn'
             when c.previous_mrr = 0 and c.current_mrr > 0 and c.report_month = f.first_active_month
                 then 'new'
             when c.previous_mrr = 0 and c.current_mrr > 0 and c.report_month > f.first_active_month
                 then 'reactivation'
-            when c.previous_mrr > 0 and c.current_mrr = 0
-                then 'churn'
             when c.current_mrr > c.previous_mrr and c.previous_mrr > 0
                 then 'expansion'
-            when c.current_mrr < c.previous_mrr and c.current_mrr > 0
+            when c.current_mrr < c.previous_mrr and c.previous_mrr > 0
                 then 'contraction'
             else 'retained'
         end as movement_type
     from combined c
     left join first_seen f on c.account_id = f.account_id
+    left join churn_events ce
+        on c.account_id = ce.account_id
+        and c.report_month = ce.report_month
     where c.current_mrr != c.previous_mrr
 )
 
