@@ -1,0 +1,118 @@
+version: 2
+
+models:
+  - name: dim_accounts
+    description: >
+      Account dimension table enriched with subscription and churn summaries.
+      One row per account with aggregated metrics.
+    columns:
+      - name: account_id
+        description: Unique customer identifier
+        data_tests:
+          - unique
+          - not_null
+
+  - name: fct_subscriptions
+    description: >
+      Subscription fact table enriched with account info and derived fields
+      like subscription status and duration.
+    columns:
+      - name: subscription_id
+        data_tests:
+          - unique
+          - not_null
+      - name: subscription_status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['trial', 'churned', 'active', 'inactive']
+
+  - name: fct_feature_usage
+    description: Feature usage events joined with subscription context
+    columns:
+      - name: usage_id
+        data_tests:
+          - unique
+          - not_null
+
+  - name: fct_support_tickets
+    description: Support tickets with derived resolution speed tier
+    columns:
+      - name: ticket_id
+        data_tests:
+          - unique
+          - not_null
+      - name: resolution_speed_tier
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['fast', 'normal', 'slow', 'very_slow']
+
+  - name: fct_churn_events
+    description: Churn events enriched with account demographics and time-to-churn
+    columns:
+      - name: churn_event_id
+        data_tests:
+          - unique
+          - not_null
+
+  - name: monthly_subscription_spine
+    description: >
+      Exploded view of subscriptions by month. Each row represents one
+      subscription active in a given month (excluding trials and zero-MRR).
+      Core building block for MRR waterfall analysis.
+    columns:
+      - name: subscription_id
+        data_tests:
+          - not_null
+      - name: report_month
+        data_tests:
+          - not_null
+
+  - name: fct_account_health_scorecard
+    description: >
+      Account-month grain health metrics combining feature usage and support
+      ticket data. Composite health score (0-1) blends engagement (feature usage
+      and errors) with customer experience (support satisfaction and escalations).
+      Enables churn risk segmentation, predictive modeling, and root-cause analysis.
+      Join to fct_churn_events on (account_id, report_month) to correlate behavioral
+      health with actual churn events.
+    columns:
+      - name: account_id
+        description: Account identifier
+        data_tests:
+          - not_null
+      - name: report_month
+        description: Calendar month of the health metrics
+        data_tests:
+          - not_null
+      - name: feature_events
+        description: Count of distinct feature usage events in the month
+      - name: total_usage_count
+        description: Sum of usage counts across all feature events
+      - name: total_error_count
+        description: Sum of errors across all feature events
+      - name: beta_feature_events
+        description: Count of beta feature usage events
+      - name: total_usage_duration_mins
+        description: Total feature usage duration in minutes
+      - name: support_tickets_count
+        description: Number of support tickets opened in the month
+      - name: avg_satisfaction_score
+        description: Average customer satisfaction score (1-5) from resolved tickets
+      - name: escalation_count
+        description: Number of escalated support tickets
+      - name: low_satisfaction_tickets
+        description: Count of tickets with satisfaction score < 3
+      - name: avg_resolution_hours
+        description: Average time to resolve support tickets
+      - name: slowest_resolution_tier
+        description: Slowest resolution speed tier ('fast', 'normal', 'slow', 'very_slow')
+      - name: health_score
+        description: Composite health score (0-1) blending engagement, errors, satisfaction, and support experience
+      - name: health_tier
+        description: Categorical health classification
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['healthy', 'at_risk', 'critical', 'no_activity']

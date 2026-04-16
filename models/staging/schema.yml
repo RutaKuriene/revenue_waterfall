@@ -1,0 +1,93 @@
+version: 2
+
+models:
+  - name: stg_accounts
+    description: Cleaned accounts from raw source
+    columns:
+      - name: account_id
+        description: Unique customer identifier
+        data_tests:
+          - unique
+          - not_null
+      - name: industry
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['DevTools', 'EdTech', 'FinTech', 'HealthTech', 'Cybersecurity']
+      - name: initial_plan_tier
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Basic', 'Pro', 'Enterprise']
+
+  - name: stg_subscriptions
+    description: Cleaned subscriptions from raw source
+    columns:
+      - name: subscription_id
+        description: Unique subscription identifier
+        data_tests:
+          - unique
+          - not_null
+      - name: account_id
+        description: FK to accounts
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_accounts')
+                field: account_id
+      - name: plan_tier
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Basic', 'Pro', 'Enterprise']
+      - name: billing_frequency
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['monthly', 'annual']
+      - name: mrr_amount
+        data_tests:
+          - not_null
+
+  - name: stg_feature_usage
+    description: Cleaned feature usage events
+    columns:
+      - name: usage_id
+        data_tests:
+          - unique
+          - not_null
+      - name: subscription_id
+        data_tests:
+          - not_null
+
+  - name: stg_support_tickets
+    description: Cleaned support tickets
+    columns:
+      - name: ticket_id
+        data_tests:
+          - unique
+          - not_null
+      - name: account_id
+        data_tests:
+          - not_null
+      - name: priority
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['low', 'medium', 'high', 'urgent']
+
+  - name: stg_churn_events
+    description: Cleaned churn events
+    columns:
+      - name: churn_event_id
+        data_tests:
+          - unique
+          - not_null
+      - name: account_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_accounts')
+                field: account_id

@@ -1,0 +1,32 @@
+
+name: oxylab
+version: 1.0.0
+config-version: 2
+profile: oxylab
+model-paths:
+  - models
+analysis-paths:
+  - analyses
+test-paths:
+  - tests
+seed-paths:
+  - seeds
+macro-paths:
+  - macros
+snapshot-paths:
+  - snapshots
+
+tests:
+  +snowflake_warehouse: COMPUTE_WH
+
+models:
+  oxylab:
+    staging:
+      +materialized: view
+      +schema: staging
+    transform:
+      +materialized: table
+      +schema: transform
+    reporting:
+      +materialized: table
+      +schema: reporting
