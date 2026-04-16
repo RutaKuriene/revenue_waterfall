@@ -41,6 +41,12 @@ Pivoted summary table - one row per month with beginning MRR, each movement buck
 ### `monthly_subscription_spine`
 Intermediate model that "explodes" each subscription into one row per active month. Excludes trials and $0 MRR subscriptions. This is the foundation for waterfall calculations.
 
+
+### `reporting_account_health_summary`
+Monthly aggregate health population metrics. Tracks the distribution of accounts across health tiers (healthy, at_risk, critical, no_activity) with percentiles and central tendency. Enables executive dashboards showing overall account population health trends and early warning signals when critical tiers grow.
+
+### `fct_account_health_scorecard` (Transform Layer)
+Account-month grain health scorecard combining feature usage and support ticket signals. Serves as the fact table for behavioral health data and enables churn prediction, risk segmentation, and root-cause analysis. Join to `fct_churn_events` on (account_id, report_month) to correlate health scores with actual churn events.
 ## Modeling Decisions & Assumptions
 
 1. **Trial exclusion**: Subscriptions where `is_trial = TRUE` or `mrr_amount = 0` are excluded from the MRR waterfall, as are considered not contributing to real revenue.
@@ -163,6 +169,7 @@ revenue_waterfall/
 |   |   |-- schema.yml
 |   |   |-- reporting_mrr_waterfall.sql
 |   |   |-- reporting_mrr_summary.sql
+|   |   |-- reporting_account_health_scorecard.sql
 |-- tests/                    # Custom singular tests
 |   |-- assert_mrr_waterfall_balances.sql
 |   |-- assert_no_negative_mrr_in_spine.sql
@@ -183,3 +190,77 @@ revenue_waterfall/
 4. **No calendar table**: The month spine is generated dynamically. A production version should use a shared calendar/date dimension.
 
 5. **Event timing dependence**: Churn month attribution depends on churn event timestamps. Late or missing events can shift churn classification across months.
+
+## Future Improvements (Production Readiness)
+
+### Scalability & Performance
+- **Incremental models** for `monthly_subscription_spine` and `fct_feature_usage` (largest tables)
+- **Cluster keys** on date columns for large scan queries
+|   |   |-- reporting_account_health_summary.sql
+|   |-- fct_account_health_scorecard.sql
+
+### Data Freshness & Incremental Strategies
+- **dbt source freshness** checks on the RAW tables
+- **Snapshots** on `subscriptions` to capture SCD Type 2 plan/tier changes over time
+- Incremental strategy: append-only for usage data, merge for subscription state
+
+### Monitoring & Data Quality Alerting
+- **dbt exposures** linking models to downstream BI dashboards
+- Automated alerting on anomalous MRR churn spikes (>2 standard deviations)
+- Elementary or re_data for historical test result tracking
+- Slack/email notifications on test failures in CI/CD pipeline
+
+## Churn Analysis & Root-Cause Enrichment
+
+The project pairs churn events with behavioral signals via `fct_account_health_scorecard`:
+
+**Pattern 1: Account-Level Churn Root-Cause (Churn Events + Health):**
+```sql
+select
+  e.account_id,
+  e.churn_month as report_month,
+  e.churn_event_id,
+  e.reason_code,
+  h.health_score,
+  h.health_tier,
+  h.total_error_count,
+  h.avg_satisfaction_score,
+  h.escalation_count,
+  h.total_usage_count
+from ANALYTICS_TRANSFORM.FCT_CHURN_EVENTS e
+left join ANALYTICS_TRANSFORM.FCT_ACCOUNT_HEALTH_SCORECARD h
+  on e.account_id = h.account_id
+  and e.churn_month = h.report_month
+where coalesce(e.is_reactivation, false) = false
+order by e.churn_month, h.health_score asc;
+```
+
+**Pattern 2: Population Health Trends + Waterfall:**
+```sql
+select
+  s.report_month,
+  s.total_accounts,
+  s.healthy_accounts,
+  s.at_risk_accounts,
+  s.critical_accounts,
+  s.avg_health_score,
+  w.churn_mrr,
+  w.contraction_mrr,
+  (w.churn_mrr + w.contraction_mrr) as total_downside_mrr
+from ANALYTICS_REPORTING.REPORTING_ACCOUNT_HEALTH_SUMMARY s
+left join (
+  select
+    report_month,
+    sum(case when movement_type = 'churn' then mrr_change else 0 end) as churn_mrr,
+    sum(case when movement_type = 'contraction' then mrr_change else 0 end) as contraction_mrr
+  from ANALYTICS_REPORTING.REPORTING_MRR_WATERFALL
+  group by report_month
+) w on s.report_month = w.report_month
+order by s.report_month;
+```
+
+**Use Cases:**
+- **Churn root-cause**: Identify if churn was driven by low engagement, high errors, poor support experience, or a combination.
+- **Early warning**: Flag accounts with critical health scores in prior month to proactively reach out before churn event.
+- **Contraction insights**: Aggregate prior-month health scores for accounts that downgrade to understand self-service vs support-driven patterns.
+- **Expansion validation**: Spot accounts with upcoming expansion activities but critical health scores to prevent churn after growth.

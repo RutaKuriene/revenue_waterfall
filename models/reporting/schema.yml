@@ -45,3 +45,42 @@ models:
         description: Month-over-month MRR growth as percentage
       - name: gross_mrr_churn_rate_pct
         description: Gross MRR churn as percentage of beginning MRR
+
+
+  - name: reporting_account_health_summary
+    description: >
+      Monthly aggregate health summary across all accounts. Provides account
+      count distribution by health tier, population health percentiles (min, median, max),
+      and central tendency metrics (mean health score). Enables executive-level health
+      dashboards and cohort trending.
+    columns:
+      - name: report_month
+        description: Calendar month
+        data_tests:
+          - unique
+          - not_null
+      - name: total_accounts
+        description: Total active accounts with behavioral signal data in the month
+      - name: healthy_accounts
+        description: Number of accounts in healthy status
+      - name: at_risk_accounts
+        description: Number of accounts in at_risk status
+      - name: critical_accounts
+        description: Number of accounts in critical status
+      - name: no_activity_accounts
+        description: Number of accounts with no feature or support activity
+      - name: pct_healthy
+        description: Percentage of accounts in healthy tier
+      - name: pct_at_risk
+        description: Percentage of accounts in at_risk tier
+      - name: pct_critical
+        description: Percentage of accounts in critical tier
+      - name: avg_health_score
+        description: Mean health score for the month
+      - name: median_health_score
+        description: Median health score for the month
+      - name: min_health_score
+        description: Minimum health score for the month
+      - name: max_health_score
+        description: Maximum health score for the month
+      - name: avg_resolution_hours
